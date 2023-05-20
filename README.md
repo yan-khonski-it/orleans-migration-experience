@@ -18,7 +18,27 @@ Our services [web-api, silos] are deployed in multiple data-centers. At any mome
 
 # Terminology
 
-[Actor model](https://en.wikipedia.org/wiki/Actor_model) actors execute tasks. Actor encapsulates state and behaviour.
+[Actor model](https://en.wikipedia.org/wiki/Actor_model) Actor encapsulates state and behaviour. Actors receive messages, can send messages to other actors, create new actors, process message.
+
+[Virtual actor](https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/?from=https://research.microsoft.com/apps/pubs/default.aspx?id=210931&type=exact) Assumes that actor always exists.
+For example, you can have client code `actorFactory.getActor(actorId).performTask(inputArguments)`. Your code can be running on machine 1, while while the factory will give you the interface to call the actual actor, that could be running on a different machine! More details futher.
+More details further.
+
+[Grain](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-grains) - virtual actor implementation in Orleans.
+
+[Silo](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-silos) - application instance that manages grains. If there are multiple instances of silos running, those instance will agree on what silo instance can host specific grains.
+The client code `grainFactory.getGrain<GrainInterfaceType>(grainId)` will figure our on which silo the grain is hosted, and returns an object proxy to that grain.
+When calling the actual method of the grain, the client will receive a promis, and the actual grain code is executed in the silo hosting the grain.
+https://learn.microsoft.com/en-us/dotnet/orleans/tutorials-and-samples/overview-helloworld
+
+Clustering - silos need to agree on who is alive and active (so they can agree on grain hosting).
+
+- https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management
+- https://learn.microsoft.com/en-us/shows/on-net/clustering-in-orleans
+- https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-placement
+
+Multi-clustering - similar to clustering, but across multiple datacenters. This actually ensures that at any moment of time, at most one task with given key can be run.
+- https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/overview
 
 // TODO Update
 
