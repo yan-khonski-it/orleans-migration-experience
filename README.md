@@ -21,14 +21,14 @@ Our services [web-api, silos] are deployed in multiple data-centers. At any mome
 [Actor model](https://en.wikipedia.org/wiki/Actor_model) Actor encapsulates state and behaviour. Actors receive messages, can send messages to other actors, create new actors, process message.
 
 [Virtual actor](https://www.microsoft.com/en-us/research/publication/orleans-distributed-virtual-actors-for-programmability-and-scalability/?from=https://research.microsoft.com/apps/pubs/default.aspx?id=210931&type=exact) Assumes that actor always exists.
-For example, you can have client code `actorFactory.getActor(actorId).performTask(inputArguments)`. Your code can be running on machine 1, while while the factory will give you the interface to call the actual actor, that could be running on a different machine! More details futher.
-More details further.
+For example, you can have client code `actorFactory.getActor(actorId).performTask(inputArguments)`. Your client code can be running on machine 1, while while the factory will give you the the proxy representing the actor type.
+However, the actual implementation of `performTask(inputArguments)` could be run on a different machine. More details further.
 
 [Grain](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-grains) - virtual actor implementation in Orleans.
 
-[Silo](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-silos) - application instance that manages grains. If there are multiple instances of silos running, those instance will agree on what silo instance can host specific grains.
+[Silo](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-silos) - application instance that manages grains. If there are multiple instances of silos running, those instance will agree on what silo instance hosts specific grains.
 The client code `grainFactory.getGrain<GrainInterfaceType>(grainId)` will figure our on which silo the grain is hosted, and returns an object proxy to that grain.
-When calling the actual method of the grain, the client will receive a promis, and the actual grain code is executed in the silo hosting the grain.
+When calling the actual method of the grain, the client will receive a promis, and the actual grain code will be executed in the silo hosting the grain.
 https://learn.microsoft.com/en-us/dotnet/orleans/tutorials-and-samples/overview-helloworld
 
 Clustering - silos need to agree on who is alive and active (so they can agree on grain hosting).
@@ -39,6 +39,38 @@ Clustering - silos need to agree on who is alive and active (so they can agree o
 
 Multi-clustering - similar to clustering, but across multiple datacenters. This actually ensures that at any moment of time, at most one task with given key can be run.
 - https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/overview
+
+# Dependencies
+
+## CosmosDB
+We use [Azure ComsosDB](https://learn.microsoft.com/en-US/azure/cosmos-db/introduction) for storing the grain state. In our case, grain represented domain topology configuration, where grain id (actor key) is domain name.
+
+## Azure Table Storage
+We used [Azure Storage Table](https://learn.microsoft.com/en-us/azure/storage/tables/table-storage-overview) so silos can communicate about statuses of themselves and neighbours.
+>  First, it is used as a rendezvous point for silos to find each other and Orleans clients to find silos. Second, we use reliable storage to help us coordinate the agreement on the membership view.
+
+https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management
+
+Also, we use it for Multi-clustering - silos in different clusters should discover each other.
+> Once a silo has learned and cached the location of a grain activation (no matter in what cluster), it sends messages to that silo directly, even if the silo is not a cluster gateway (in a separate cluster).
+
+https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/gossip-channels
+
+## Azure Key Vault
+We stored our configuration (both property names and secrets) inside [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview).
+
+# Implementation details
+
+## Plan. 
+At the beginning I could not estimate the task because I wasnot familiar with most of the tach stack. I started with learnign and reading documentation.
+
+### Backup and restore
+In order to proceed with the migration, I needed to prepare for the worst.
+[Back up and restore for CosmosDB](https://learn.microsoft.com/en-us/azure/cosmos-db/restore-account-continuous-backup).
+[Azure Table storage did not have recovery](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-storage/data-protection-backup-recovery#non-supported-storage-recovery), but I found a manual work around with
+[Azure Storage Explorer](https://azure.microsoft.com/en-us/products/storage/storage-explorer)
+Later, I found out that we do not need to restore Azure Table Storage, we can delete the table completely, and it will be populated automatically after some time.
+Learned how to deploy a new version of our services and rollback to the previous version. (Fortunately, I did not need to use it, but it is importan to know this in case of a problem).
 
 // TODO Update
 
