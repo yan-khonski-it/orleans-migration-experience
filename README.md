@@ -66,7 +66,7 @@ We stored our configuration (both property names and secrets) inside [Azure Key 
 
 # Implementation details
 ## Pre plan
-I tried to upgrade Orleans into the next version [3.2.0](https://github.com/dotnet/orleans/releases/tag/v3.2.0). However, it had breaking change, [it removed multiclustering support](https://github.com/dotnet/orleans/pull/6498).
+I tried to upgrade Orleans into the next version [3.2.0](https://github.com/dotnet/orleans/releases/tag/v3.2.0). It is the next version after 3.1.7. However, it had breaking change, [it removed multiclustering support](https://github.com/dotnet/orleans/pull/6498).
 Some classes were removed, so our code did not compile. I had to revert the changes and make proper plan.
 
 ## Asking why
