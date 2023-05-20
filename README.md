@@ -83,9 +83,9 @@ we wanted to make sure that at most one task for given domain can be running at 
 - *Could we replace or avoid multi-clustering*?
 It is our next goal after the Orleans migration is done. There were several ideas, I just mention them briefly here.
 They require futher research and time, and our team had to focus on other tasks, while I was working on the migration.
-- Allow only a single region to write data, while the other region is stand by.
-- Implement custom locking mechanism.
-- Use messaging, for example, [Azure Service Bus](https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services#azure-service-bus), and make sure that a message can be consumed by one consumer.
+    - Allow only a single region to write data, while the other region is stand by.
+    - Implement custom locking mechanism.
+    - Use messaging, for example, [Azure Service Bus](https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services#azure-service-bus), and make sure that a message can be consumed by one consumer.
 We did not want to use Kafka, because it would bring more operational work (we wanted to use existing tools, but we may change our mind in the future though).
 We did not want to use "high level" Azure Services such as Service Bus, because if such service goes down, the whole Microsoft Identity Organization could also go down. We wanted to use "Low level" services that would not affect Identity Services.
 
