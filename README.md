@@ -57,6 +57,10 @@ Also, we use it for Multi-clustering - silos in different clusters should discov
 
 https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/gossip-channels
 
+## Azure VNET
+We use VNets to connect multiple deployments within a region, and gateways to connect VNets across different regions.
+https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview
+
 ## Azure Key Vault
 We stored our configuration (both property names and secrets) inside [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview).
 
