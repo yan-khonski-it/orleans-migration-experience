@@ -10,9 +10,8 @@ Our services [web-api, silos] are deployed in multiple data-centers. At any mome
 > **Task key** is domain name for which we want to update topology.
 
 ## Reasons to upgrade the library
-- We used old version of [Orleans 3.1.7](https://github.com/dotnet/orleans/tree/v3.1.7) which did not received updates since end of May 2020.
+- We used old version of [Orleans 3.1.7](https://github.com/dotnet/orleans/tree/v3.1.7) which did not received updates, bug-fixes since end of May 2020.
 - We received security alerts that we needed to upgrade libraries. Some old libraries could not be updated because that version of Orleans depended on them.
-- Old version of Orleans did not receive updates and bug fixes.
 - We used .NET version 6, and we wanted to upgrade to [.NET 7](https://en.wikipedia.org/wiki/.NET) and further. We could not because old Orleans would not work there.
 - We even had plans to get rid of Orleans and replace it with more robust and documented solutions, but first we needed to understand how to migrate.
 
