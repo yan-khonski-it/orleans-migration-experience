@@ -1,9 +1,9 @@
-# orleans-migration-experience
-Here, I put notes about Orleans Migration at Microsoft
+# orleans upgrade experience
+Here, I put notes about Orleans upgrade - a task that I finished at Microsoft
 
 # Big Picture
 
-We have clients that want to run long tasks (3 - 10 minutes) that call external API and update data in the database. Each task has key.
+We have clients that want to run long tasks (3 - 10 minutes) that call external API (that could be retried) and update data in the database. Each task has key.
 Our services [web-api, silos] are deployed in multiple data-centers. At any moment of time, there could be multiple running tasks, but **for any key, there could be at most one running task at any time across data centers**.
 
 > [More details] We need to update DNS topology of a service in multiple DNS providers / [traffic managers](https://learn.microsoft.com/en-us/azure/traffic-manager/traffic-manager-overview) and store resulted DNS configuration in database for given domain. 
@@ -25,12 +25,13 @@ However, the actual implementation of `performTask(inputArguments)` could be run
 
 [Grain](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-grains) - virtual actor implementation in Orleans.
 
-[Silo](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-silos) - application instance that manages grains. If there are multiple instances of silos running, those instance will agree on what silo instance hosts specific grains.
+[Silo](https://learn.microsoft.com/en-us/dotnet/orleans/overview#what-are-silos) - application instance that manages grains. If there are multiple instances of silos running, these instance will agree on what silo instance hosts specific grains.
 The client code `grainFactory.getGrain<GrainInterfaceType>(grainId)` will figure our on which silo the grain is hosted, and returns an object proxy to that grain.
-When calling the actual method of the grain, the client will receive a promis, and the actual grain code will be executed in the silo hosting the grain.
+When calling the actual method of the grain, the client will receive a promise, and the actual grain code will be executed in the silo hosting the grain.
 https://learn.microsoft.com/en-us/dotnet/orleans/tutorials-and-samples/overview-helloworld
 
-Silo gateway - TODO add definition
+Cluster gateway - a subset of active silos in the given cluster, that advertise their IP address. When silos in different clusters are discovering each other, silo gateway works as "points of first contact".
+> Once a silo has learned and cached the location of a grain activation (no matter in what cluster), it sends messages to that silo directly, even if the silo is not a cluster gateway.
 
 Clustering - silos need to agree on who is alive and active (so they can agree on grain hosting).
 
@@ -52,17 +53,16 @@ We used [Azure Storage Table](https://learn.microsoft.com/en-us/azure/storage/ta
 
 https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management
 
-Also, we use it for Multi-clustering - silos in different clusters should discover each other.
-> Once a silo has learned and cached the location of a grain activation (no matter in what cluster), it sends messages to that silo directly, even if the silo is not a cluster gateway (in a separate cluster).
+Also, we use Azure Table Storage for Multi-clustering - silos in different clusters should discover each other.
 
 https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/gossip-channels
 
 ## Azure VNET
-We use VNets to connect multiple deployments within a region, and gateways to connect VNets across different regions.
+We use VNets to connect multiple deployments within a region, and we also use VNET to connect gateways across different regions.
 https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-overview
 
 ## Azure Key Vault
-We stored our configuration (both property names and secrets) inside [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview).
+We store our configuration (both property names and secrets) inside [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview).
 
 # Implementation details
 ## Pre plan
@@ -101,11 +101,13 @@ https://github.com/dotnet/orleans/issues/7485
 However, after I have talked to several teams that use official Microsoft.Orleans I found one team that also needed multi-clustering, so they have already implemented it.
 That team, let me name it DFP, used their fork of Orleans, which they named DFP.Orleans. 
 
-Now, I had to decide if we could use the fork DFP.Orleans (this fork is in Microsoft private repository, so I cannot share details about it).
+Now, I had to decide if we could use the fork DFP.Orleans (this fork is in Microsoft private repository, so I cannot put links here).
 The idea they used, they require that silos in multiple regions should use the shared VNET.
 https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/gossip-channels
 
-### Backup and restore
+Then  they implemented multi-clustering similar way as they had for clustering.
+
+## Backup and restore
 In order to proceed with the migration, I needed to prepare for the worst.
 [Back up and restore for CosmosDB](https://learn.microsoft.com/en-us/azure/cosmos-db/restore-account-continuous-backup).
 [Azure Table storage did not have recovery](https://learn.microsoft.com/en-us/troubleshoot/azure/azure-storage/data-protection-backup-recovery#non-supported-storage-recovery), but I found a manual work around with
@@ -113,8 +115,16 @@ In order to proceed with the migration, I needed to prepare for the worst.
 Later, I found out that we do not need to restore Azure Table Storage, we can delete the table completely, and it will be populated automatically after some time.
 Learned how to deploy a new version of our services and rollback to the previous version. (Fortunately, I did not need to use it, but it is importan to know this in case of a problem).
 
+## Code details
+There we no documentation, so I had to debug our code with old Orleans and compare it with DFP.Orleans and this is how I fixed issues.
+A few things I had to change: 
+Remove all code that depended on `MultiClusterOptions` because this class was removed. Re-write such components, so they use `GlobalClustering` configuration.
+Replace deprecated methods with the methods that had similar result. In my case, I had to tell Orleans how to connect to Azure Table Storage and use it for clustering.
 
+After that I found a new error in logs, and after debuggin it for a day, I found out that DFP.Orleans had issues. 
 
+After testing [more details bellow], I found out that multi-clustering was not working. Silos could discover each other in the same cluster, but they could not talk to the silos in different cluster.
+I had to debug two code bases: our project and DFP project to compare the configuration. After checking git history, I found out that they fixed one bug related to running applications on local machine, so 
 
 
 -------------------------------------------------
