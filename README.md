@@ -136,31 +136,43 @@ src/Orleans.Core.Abstractions/IDs/GrainId.cs
 commit
 https://github.com/dotnet/orleans/commit/0894246444c7101a54905a0f0a402bfc27f1054e#diff-6ac8d163b8c760895ac0b8b0977e9d00b298e6ca6cef411786bd57cd528f3888
 
-To fix the issue,  I had to copy the logic of id generation from the old code. Fortnately, I made work-around code short and clear - I used reflection API to retrieve the fields required for ID generation and passed those fields into the original logic for id generation.
+To fix the issue,  I had to copy the logic of id generation from the old code. My work-around used reflection API to retrieve the fields required for ID generation and passed those fields into the original logic for id generation.
 
 Additionally, I added tests for all our grains to make sure that our grain id will not change.
 As an alternative, I could run a database migration where I would read grains with old id and re-write them with new id, but that would have taken longer.
 
-After testing [more details bellow], I found out that multi-clustering was not working. Silos discovered each other in the same cluster, but they could not talk to the silos in different cluster.
-I had to debug two code bases: our project and DFP project to compare the configuration. After checking git history, I found out that DFP team fixed one bug related to running applications on local machine, so I had to enabled two of feature flags, that were disabled by default and not documented.
+After testing *[more details bellow]*, I found out that multi-clustering was not working. Silos discovered each other in the same cluster, but they could not talk to the silos in different cluster.
+I had to debug two code bases: our project and DFP project to compare the configuration. After checking git history, I found out that DFP team fixed one bug related to running applications on local machine, so I had to enabled one boolean flag, that was disabled by default and not documented.
 
 After each fix and iteration, I had to test.
 
 ## How I tested
+I compared logs of our application before the migration and after the migration. For each warning and error, 1) check if such warning / errors was present in the old version of the application 2) if the warning or error is new - fix it.
+I had to check k8s pods that they are not restarting. 
+I had to check monitoring tools, to make sure that our silos receive traffic and they are healthy.
+To check mutli-clustering, I had to check logs info messages related to clustering, silos communication, silos discovery, multi-clustering. Additionally, I had to check data in Azure Storage Table.
+When silos are able to communicate to each other, the table will have rows for each silo with status `ACTIVE`, and other silos do not suspect it. Same applies to multi-clustering communication
+(for multi-clustering we also use Azure Storage Table).
+After that I ran verification tests (automated tests that would run domain changes and then these test verify that data is correct in external API and in our database).
+And then again check monitoring, logs for the time that the tests were running.
 
 
+## How I deployed to prod
+After all the tests, logs, monitoring passed, I started to deploy to prod. My team and I agreed that we deploy on Monday (to allow our on call engineer to enjoy the weekend).
+So on Monday, May 15, 2023 we deployed successfully. After we deployed to production, we monitored it, and we did not have issues, incidents, dashboards looked healthy, logs were looking good.
 
--------------------------------------------------
-// TODO Update
+One last problem to mention. If you have running application with [old and new Orleans, silos won't be able to disover each other](https://learn.microsoft.com/en-us/dotnet/orleans/migration-guide).
+I had two options, to create a new cluster, or update our clusters, allowing short downtime (around 5 minutes).
+Our team agreed to short downtime. Some we had traffic coming to one datacenter. We had other datacenters inactive (they were running, but the traffic went to the active datacenter).
+We deployed into inactive datacenters. Then we deployed into active datacenter. Why not switching traffic from active into new inactive?
+Because there was a risk that in active datacenter someone could run a job, and then the job with the same domain could be started in the inactive datacenter (if it received traffic).
+Again, silos (with different Orleans versions) across datacenters did not communicate to each other.
+This is why we needed downtime, to make sure that old jobs are stopped with old version of library and then restarted with new version of the library.
 
-Created a plan for migration, including back up strategy for CosmosDB and Azure Storage Table. Verified that our test and prod environments have the same configuration for clustering (services need to schedule jobs in the cluster, but at most one job with given key is allowed to run at any moment) and multi-clustering (services should agree about scheduling jobs, but at most one job with given key is allowed to run across multiple datacenters). Microsoft removed multi-clustering support from Orleans. Discovered and used a fork (created internally at Microsoft) of Orleans with multi-clustering support.  I studied four  repositories [our code, the fork code, original Orleans code, and another project that used the fork]. Re-wrote configuration related code (some classes were removed had to implementing missing parts). New version of Olreans changed id format of jobs state stored in CosmosDB. I fix the logic responsible for id generation, added tests for enforcing old id format is used. Finally, I found and fixed issues related that some services in different datacenters could not discover each other (potentially multiple jobs with the same key could run and corrupt the data). Deployed the migration, very short downtime (one region was not accepting the traffic, deployed there, deployed into the active region)  
-
-
-
-Created plan and at the end tested that migration did not corrupt the data and multi-clustering and clustering conditions are satisfied. 
-whiSolved problems with clustering (silo instances should be discovered in one datacenter) and multi-clustering (services should be discovered in different datacenters and be able to distributed the work). The problem was that official Microsoft.Orleans removed support for multi-clustering.
-https://github.com/dotnet/orleans/issues/7485
-https://learn.microsoft.com/en-us/dotnet/orleans/migration/
-https://github.com/dotnet/orleans/commit/ff7b602f5be4bfde9f5c80e77462d327d2c20bef
-It enabled us to upgrade other libraries.
-
+## Links
+- https://learn.microsoft.com/en-us/dotnet/orleans/migration-guide
+- https://learn.microsoft.com/en-us/dotnet/orleans/implementation/cluster-management
+- https://learn.microsoft.com/en-us/shows/on-net/clustering-in-orleans
+- https://learn.microsoft.com/en-us/dotnet/orleans/grains/grain-placement
+- https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/gossip-channels
+- https://learn.microsoft.com/en-us/dotnet/orleans/deployment/multi-cluster-support/overview
