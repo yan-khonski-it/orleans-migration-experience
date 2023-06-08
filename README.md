@@ -1,5 +1,5 @@
 # orleans upgrade experience
-Here, I put notes about Orleans upgrade - a task that I finished at Microsoft
+Here, I put notes about Orleans upgrade - the largest task I finished at Microsoft.
 
 # Big Picture
 
